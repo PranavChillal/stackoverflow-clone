@@ -1202,7 +1202,8 @@ export const resendLoginOTP =
             });
         }
     };
-    /*
+
+/*
 |--------------------------------------------------------------------------
 | Forgot Password
 |--------------------------------------------------------------------------
@@ -1754,76 +1755,84 @@ export const requestLanguageChange =
             existinguser.languageOtpVerified =
                 false;
 
+            await existinguser.save();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Send English/French OTP Email Without Blocking Response
+            |--------------------------------------------------------------------------
+            |
+            | English and French use the registered email address for the
+            | language-switch verification flow. The OTP has already been
+            | hashed and stored in MongoDB before the email is sent.
+            |--------------------------------------------------------------------------
+            */
+
             if (
-                language !==
-                    "french" &&
-                !existinguser.phone?.trim()
+                language ===
+                    "english" ||
+                language ===
+                    "french"
             ) {
+                void sendLanguageOTPEmail({
+                    to:
+                        existinguser.email,
+
+                    name:
+                        existinguser.name,
+
+                    otp,
+
+                    language:
+                        languageNames[
+                            language
+                        ],
+                }).catch((emailError) => {
+                    console.error(
+                        "Language OTP email error:",
+                        emailError
+                    );
+                });
+
+                return res.status(200).json({
+                    message:
+                        "A verification OTP has been sent to your registered email address to change your language to " +
+                        languageNames[
+                            language
+                        ] +
+                        ".",
+
+                    verificationMethod:
+                        "email",
+
+                    language,
+
+                    ...(process.env.NODE_ENV !==
+                    "production"
+                        ? {
+                              developmentOtp:
+                                  otp,
+                          }
+                        : {}),
+                });
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Other Languages
+            |--------------------------------------------------------------------------
+            |
+            | Preserve the existing mobile-OTP branch for the other supported
+            | languages so no unrelated functionality is removed.
+            |--------------------------------------------------------------------------
+            */
+
+            if (!existinguser.phone?.trim()) {
                 return res.status(400).json({
                     message:
                         "Please add a registered mobile number before changing to this language.",
                 });
             }
-
-            await existinguser.save();
-
-if (
-    language ===
-    "french"
-) {
-    /*
-    |--------------------------------------------------------------------------
-    | Send French OTP Email Without Blocking Response
-    |--------------------------------------------------------------------------
-    |
-    | The OTP has already been hashed and stored in MongoDB.
-    | Send the email in the background so Gmail/Nodemailer latency
-    | does not delay the verification popup.
-    |--------------------------------------------------------------------------
-    */
-
-    void sendLanguageOTPEmail({
-        to:
-            existinguser.email,
-
-        name:
-            existinguser.name,
-
-        otp,
-
-        language:
-            languageNames[
-                language
-            ],
-    }).catch((emailError) => {
-        console.error(
-            "Language OTP email error:",
-            emailError
-        );
-    });
-
-    return res.status(200).json({
-        message:
-            "A verification OTP has been sent to your registered email address to change your language to " +
-            languageNames[
-                language
-            ] +
-            ".",
-
-        verificationMethod:
-            "email",
-
-        language,
-
-        ...(process.env.NODE_ENV !==
-        "production"
-            ? {
-                  developmentOtp:
-                      otp,
-              }
-            : {}),
-    });
-}
 
             return res.status(200).json({
                 message:
