@@ -8,206 +8,213 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 
 import axiosInstance from "@/lib/axiosinstance";
+import { useAuth } from "@/lib/AuthContext";
+import translations from "@/lib/translations";
 
 export default function SignUpPage() {
-    const router = useRouter();
+  const router = useRouter();
+  const auth = useAuth() as any;
 
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [loading, setLoading] = useState(false);
+  const language = auth?.language || "english";
+  const languageKey = language as keyof typeof translations;
+  const t = translations[languageKey] || translations.english;
 
-    const handleSignup = async () => {
-        if (!name || !email || !password) {
-            alert("Please fill in all fields");
-            return;
-        }
+  const a = (t as any).auth || (translations.english as any).auth;
+  const qd =
+    (t as any).questionDetail || (translations.english as any).questionDetail;
 
-        try {
-            setLoading(true);
+  const displayNameLabel =
+    (t as any).displayName || a.displayName || "Display Name";
 
-            const res = await axiosInstance.post("/user/signup", {
-                name,
-                email,
-                password,
-            });
+  const displayNamePlaceholder =
+    (t as any).displayNamePlaceholder ||
+    a.displayNamePlaceholder ||
+    "Enter your display name";
 
-            localStorage.setItem(
-                "user",
-                JSON.stringify(res.data.data)
-            );
+  const mobileNumberLabel =
+    (t as any).mobileNumber || a.mobileNumber || "Mobile Number";
 
-            alert("Signup successful!");
+  const mobilePlaceholder =
+    (t as any).mobilePlaceholder ||
+    a.mobilePlaceholder ||
+    "Enter your mobile number";
 
-            router.push("/");
-        } catch (error: any) {
-            console.log(error);
+  const mobileLanguageVerification =
+    (t as any).mobileLanguageVerification ||
+    a.mobileLanguageVerification ||
+    "Your mobile number is used for language verification.";
 
-            alert(
-                error.response?.data?.message ||
-                "Signup failed"
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-    return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 text-gray-900">
-            <div className="w-full max-w-md">
+  const handleSignup = async () => {
+    if (!name || !email || !phone || !password) {
+      alert(a.pleaseFillAllFields);
+      return;
+    }
 
-                <div className="text-center mb-6">
-                    <Link
-                        href="/"
-                        className="inline-flex items-center justify-center"
-                    >
-                        <img
-                            src="/logo.png"
-                            alt="CodeQuest"
-                            className="h-10 w-auto"
-                        />
-                    </Link>
-                </div>
+    if (!/^[0-9]{10}$/.test(phone)) {
+      alert(a.validMobileNumber);
+      return;
+    }
 
-                <Card className="bg-white text-gray-900">
-                    <CardContent className="pt-6">
+    try {
+      setLoading(true);
 
-                        <div className="text-center mb-6">
-                            <h1 className="text-2xl font-bold text-gray-900">
-                                Create your account
-                            </h1>
+      const res = await axiosInstance.post("/user/signup", {
+        name,
+        email,
+        phone,
+        password,
+      });
 
-                            <p className="mt-2 text-gray-600">
-                                Join the Stack Overflow Community
-                            </p>
-                        </div>
+      localStorage.setItem("user", JSON.stringify(res.data.data));
 
-                        <Button
-                            variant="outline"
-                            className="w-full h-11 bg-white text-gray-900 border-gray-300"
-                        >
-                            <span className="mr-2 font-bold">
-                                G
-                            </span>
-                            Log in with Google
-                        </Button>
+      alert(a.signupSuccessful);
 
-                        <Button
-                            variant="outline"
-                            className="w-full h-11 mt-3 bg-white text-gray-900 border-gray-300"
-                        >
-                            <span className="mr-2 font-bold">
-                                GH
-                            </span>
-                            Log in with GitHub
-                        </Button>
+      router.push("/");
+    } catch (error: any) {
+      console.log(error);
 
-                        <div className="flex items-center gap-4 py-6">
-                            <div className="h-px bg-gray-300 flex-1" />
+      alert(error.response?.data?.message || a.signupFailed);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-                            <span className="text-sm text-gray-600">
-                                OR CONTINUE WITH
-                            </span>
+  return (
+    <div className="flex min-h-screen w-full items-center justify-center bg-zinc-50 px-3 py-6 sm:px-4 sm:py-8 md:px-6">
+      <Card className="w-full max-w-md overflow-hidden">
+        <CardContent className="p-4 sm:p-6 md:p-7">
+          {/* Heading */}
+          <div className="mb-6 text-center">
+            <h1 className="break-words text-xl font-bold text-zinc-900 sm:text-2xl">
+              {a.createAccount}
+            </h1>
 
-                            <div className="h-px bg-gray-300 flex-1" />
-                        </div>
+            <p className="mt-2 break-words text-sm leading-5 text-zinc-600">
+              {a.joinCommunity}
+            </p>
+          </div>
 
-                        <div className="space-y-2">
-                            <Label className="text-gray-900">
-                                Display Name
-                            </Label>
+          {/* Signup Form */}
+          <div className="space-y-5">
+            {/* Display Name */}
+            <div>
+              <Label htmlFor="name">{displayNameLabel}</Label>
 
-                            <Input
-                                value={name}
-                                onChange={(e) =>
-                                    setName(e.target.value)
-                                }
-                                placeholder="demo"
-                                className="h-11 bg-white text-gray-900 placeholder:text-gray-400 border-gray-300"
-                            />
-                        </div>
-
-                        <div className="space-y-2 mt-4">
-                            <Label className="text-gray-900">
-                                Email
-                            </Label>
-
-                            <Input
-                                type="email"
-                                value={email}
-                                onChange={(e) =>
-                                    setEmail(e.target.value)
-                                }
-                                placeholder="you@example.com"
-                                className="h-11 bg-white text-gray-900 placeholder:text-gray-400 border-gray-300"
-                            />
-                        </div>
-
-                        <div className="space-y-2 mt-4">
-                            <Label className="text-gray-900">
-                                Password
-                            </Label>
-
-                            <Input
-                                type="password"
-                                value={password}
-                                onChange={(e) =>
-                                    setPassword(e.target.value)
-                                }
-                                placeholder="Password"
-                                className="h-11 bg-white text-gray-900 placeholder:text-gray-400 border-gray-300"
-                            />
-
-                            <p className="text-xs text-gray-600">
-                                Passwords must contain at least eight
-                                characters, including at least 1 letter
-                                and 1 number.
-                            </p>
-                        </div>
-
-                        <div className="flex items-start gap-2 mt-4">
-                            <input
-                                type="checkbox"
-                                id="terms"
-                                className="mt-1 h-4 w-4"
-                            />
-
-                            <label
-                                htmlFor="terms"
-                                className="text-sm text-gray-700"
-                            >
-                                I agree to the{" "}
-                                <span className="text-blue-600">
-                                    Terms of Service
-                                </span>{" "}
-                                and{" "}
-                                <span className="text-blue-600">
-                                    Privacy Policy
-                                </span>
-                            </label>
-                        </div>
-
-                        <Button
-                            onClick={handleSignup}
-                            disabled={loading}
-                            className="w-full h-11 mt-5 bg-blue-600 text-white hover:bg-blue-700"
-                        >
-                            {loading ? "Signing up..." : "Sign up"}
-                        </Button>
-
-                        <p className="text-center text-sm text-gray-600 mt-5">
-                            Already have an account?{" "}
-                            <Link
-                                href="/auth"
-                                className="text-blue-600 hover:underline"
-                            >
-                                Log in
-                            </Link>
-                        </p>
-
-                    </CardContent>
-                </Card>
+              <Input
+                id="name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={displayNamePlaceholder}
+                autoComplete="name"
+                className="mt-1 h-11 w-full"
+              />
             </div>
-        </div>
-    );
+
+            {/* Email */}
+            <div>
+              <Label htmlFor="email">{a.email || "Email"}</Label>
+
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={a.email || "Enter your email"}
+                autoComplete="email"
+                className="mt-1 h-11 w-full"
+              />
+            </div>
+
+            {/* Mobile Number */}
+            <div>
+              <Label htmlFor="phone">{mobileNumberLabel}</Label>
+
+              <Input
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder={mobilePlaceholder}
+                autoComplete="tel"
+                inputMode="numeric"
+                maxLength={10}
+                className="mt-1 h-11 w-full"
+              />
+
+              <p className="mt-1 break-words text-xs leading-5 text-zinc-500">
+                {mobileLanguageVerification}
+              </p>
+            </div>
+
+            {/* Password */}
+            <div>
+              <Label htmlFor="password">{a.password || "Password"}</Label>
+
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={a.password || "Password"}
+                autoComplete="new-password"
+                className="mt-1 h-11 w-full"
+              />
+
+              <p className="mt-1 break-words text-xs leading-5 text-zinc-500">
+                {a.passwordRequirements}
+              </p>
+            </div>
+
+            {/* Terms */}
+            <div className="flex items-start gap-2">
+              <input
+                id="terms"
+                type="checkbox"
+                className="mt-1 h-4 w-4 shrink-0 rounded border-zinc-300"
+              />
+
+              <label
+                htmlFor="terms"
+                className="break-words text-xs leading-5 text-zinc-600"
+              >
+                {a.agreeTo}{" "}
+                <span className="text-blue-600">{qd.termsOfService}</span>{" "}
+                {qd.and}{" "}
+                <span className="text-blue-600">{qd.privacyPolicy}</span>
+              </label>
+            </div>
+
+            {/* Signup */}
+            <Button
+              type="button"
+              onClick={handleSignup}
+              disabled={loading}
+              className="min-h-11 w-full"
+            >
+              {loading ? a.signingUp : a.signUp}
+            </Button>
+          </div>
+
+          {/* Login */}
+          <div className="mt-6 text-center text-sm text-zinc-600">
+            <span className="break-words">{a.alreadyHaveAccount} </span>
+
+            <Link
+              href="/auth"
+              className="inline-block px-1 py-1 text-blue-600 hover:underline"
+            >
+              {a.logIn}
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

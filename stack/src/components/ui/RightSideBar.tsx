@@ -1,91 +1,98 @@
+"use client";
+
 import React from "react";
+import { useAuth } from "@/lib/AuthContext";
+import translations from "@/lib/translations";
 
 const RightSideBar = () => {
-    return (
-        <aside className="w-64 shrink-0 p-4 bg-white">
+  const auth = useAuth() as any;
 
-            {/* The Overflow Blog */}
-            <div className="border rounded-lg mb-4">
-                <div className="bg-yellow-50 p-4 border-b">
-                    <h3 className="font-bold text-base mb-3">
-                        The Overflow Blog
-                    </h3>
+  const language = auth?.language || "english";
 
-                    <div className="space-y-3 text-sm">
-                        <p className="flex gap-2">
-                            <span>🖉</span>
-                            A new era of Stack Overflow
-                        </p>
+  const languageKey = language as keyof typeof translations;
 
-                        <p className="flex gap-2">
-                            <span>🖉</span>
-                            How your favorite movie is changing language learning
-                            technology
-                        </p>
-                    </div>
-                </div>
-            </div>
+  const t = translations[languageKey] || translations.english;
 
-            {/* Featured on Meta */}
-            <div className="border rounded-lg mb-6">
-                <div className="p-4">
-                    <h3 className="font-bold text-base mb-3">
-                        Featured on Meta
-                    </h3>
+  return (
+    <aside className="w-64 shrink-0 overflow-hidden bg-white p-4">
+      {/* The Overflow Blog */}
 
-                    <div className="space-y-3 text-sm">
-                        <p className="flex gap-2">
-                            <span>💬</span>
-                            Results of the June 2025 Community Asks Sprint
-                        </p>
+      <div className="mb-4 rounded-lg border">
+        <div className="border-b bg-yellow-50 p-4">
+          <h3 className="mb-3 text-base font-bold">{t.overflowBlog}</h3>
 
-                        <p className="flex gap-2">
-                            <span>💬</span>
-                            Will you help build our new visual identity?
-                        </p>
+          <div className="space-y-3 text-sm">
+            <p className="flex gap-2 break-words">
+              <span className="shrink-0">🖉</span>
+              <span className="min-w-0">{t.overflowArticle1}</span>
+            </p>
 
-                        <p className="flex gap-2">
-                            <span>📋</span>
-                            Policy: Generative AI (e.g., ChatGPT) is banned
-                        </p>
-                    </div>
-                </div>
-            </div>
+            <p className="flex gap-2 break-words">
+              <span className="shrink-0">🖉</span>
+              <span className="min-w-0">{t.overflowArticle2}</span>
+            </p>
+          </div>
+        </div>
+      </div>
 
-            {/* Custom Filters */}
-            <div className="mb-6">
-                <h3 className="font-bold text-base mb-4">
-                    Custom Filters
-                </h3>
+      {/* Featured on Meta */}
 
-                <button className="border border-blue-400 text-blue-600 rounded-md px-3 py-2 text-sm">
-                    Create a custom filter
-                </button>
-            </div>
+      <div className="mb-6 rounded-lg border">
+        <div className="p-4">
+          <h3 className="mb-3 text-base font-bold">{t.featuredMeta}</h3>
 
-            {/* Watched Tags */}
-            <div>
-                <h3 className="font-bold text-base mb-8">
-                    Watched Tags
-                </h3>
+          <div className="space-y-3 text-sm">
+            <p className="flex gap-2 break-words">
+              <span className="shrink-0">💬</span>
+              <span className="min-w-0">{t.meta1}</span>
+            </p>
 
-                <div className="text-center text-gray-400">
-                    <div className="text-5xl mb-4">
-                        ◉
-                    </div>
+            <p className="flex gap-2 break-words">
+              <span className="shrink-0">💬</span>
+              <span className="min-w-0">{t.meta2}</span>
+            </p>
 
-                    <p className="text-sm">
-                        Watch tags to curate your list of questions.
-                    </p>
+            <p className="flex gap-2 break-words">
+              <span className="shrink-0">📋</span>
+              <span className="min-w-0">{t.meta3}</span>
+            </p>
+          </div>
+        </div>
+      </div>
 
-                    <button className="mt-4 border border-blue-400 text-blue-600 rounded-md px-3 py-2 text-sm">
-                        👁 Watch a tag
-                    </button>
-                </div>
-            </div>
+      {/* Custom Filters */}
 
-        </aside>
-    );
+      <div className="mb-6">
+        <h3 className="mb-4 text-base font-bold">{t.customFilters}</h3>
+
+        <button
+          type="button"
+          className="max-w-full rounded-md border border-blue-400 px-3 py-2 text-sm text-blue-600"
+        >
+          {t.createFilter}
+        </button>
+      </div>
+
+      {/* Watched Tags */}
+
+      <div>
+        <h3 className="mb-8 text-base font-bold">{t.watchedTags}</h3>
+
+        <div className="text-center text-gray-400">
+          <div className="mb-4 text-5xl">◉</div>
+
+          <p className="break-words text-sm">{t.watchedDescription}</p>
+
+          <button
+            type="button"
+            className="mt-4 max-w-full rounded-md border border-blue-400 px-3 py-2 text-sm text-blue-600"
+          >
+            👁 {t.watchTag}
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
 };
 
 export default RightSideBar;

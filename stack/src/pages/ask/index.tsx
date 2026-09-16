@@ -2,190 +2,185 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import MainLayout from "@/layout/MainLayout";
 import axiosInstance from "@/lib/axiosinstance";
+import { useAuth } from "@/lib/AuthContext";
+import translations from "@/lib/translations";
 
 const AskQuestion = () => {
-    const router = useRouter();
+  const router = useRouter();
+  const auth = useAuth() as any;
 
-    const [title, setTitle] = useState("");
-    const [details, setDetails] = useState("");
-    const [tags, setTags] = useState("");
-    const [currentUser, setCurrentUser] = useState<any>(null);
-    const [loading, setLoading] = useState(false);
+  const language = auth?.language || "english";
+  const languageKey = language as keyof typeof translations;
 
-    useEffect(() => {
-        const storedUser = localStorage.getItem("user");
+  const t = (translations[languageKey] || translations.english) as any;
 
-        if (storedUser) {
-            try {
-                setCurrentUser(JSON.parse(storedUser));
-            } catch (error) {
-                console.log("Unable to read stored user");
-            }
-        }
-    }, []);
+  const q = t.askQuestionPage || translations.english.askQuestionPage;
 
-    const handleReview = async () => {
-        if (!currentUser?._id) {
-            alert("Please log in before asking a question.");
-            return;
-        }
+  const [title, setTitle] = useState("");
+  const [details, setDetails] = useState("");
+  const [tags, setTags] = useState("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-        if (!title.trim()) {
-            alert("Please enter a title.");
-            return;
-        }
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
 
-        if (!details.trim() || details.trim().length < 20) {
-            alert("Please provide at least 20 characters in the details.");
-            return;
-        }
+    if (storedUser) {
+      try {
+        setCurrentUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.log("Unable to read stored user");
+      }
+    }
+  }, []);
 
-        if (!tags.trim()) {
-            alert("Please add at least one tag.");
-            return;
-        }
+  const handleReview = async () => {
+    if (!currentUser?._id) {
+      alert(q.loginRequired);
+      return;
+    }
 
-        const tagList = tags
-            .split(" ")
-            .map((tag) => tag.trim())
-            .filter((tag) => tag !== "")
-            .slice(0, 5);
+    if (!title.trim()) {
+      alert(q.titleRequired);
+      return;
+    }
 
-        try {
-            setLoading(true);
+    if (!details.trim() || details.trim().length < 20) {
+      alert(q.detailsRequired);
+      return;
+    }
 
-            const res = await axiosInstance.post("/question/ask", {
-                title: title.trim(),
-                body: details.trim(),
-                tags: tagList,
-                userId: currentUser._id,
-            });
+    if (!tags.trim()) {
+      alert(q.tagsRequired);
+      return;
+    }
 
-            alert("Question posted successfully!");
+    const tagList = tags
+      .split(" ")
+      .map((tag) => tag.trim())
+      .filter((tag) => tag !== "")
+      .slice(0, 5);
 
-            const questionId = res.data.data._id;
+    try {
+      setLoading(true);
 
-            router.push(`/questions/${questionId}`);
-        } catch (error: any) {
-            console.log(error);
+      const res = await axiosInstance.post("/question/ask", {
+        title: title.trim(),
+        body: details.trim(),
+        tags: tagList,
+        userId: currentUser._id,
+      });
 
-            alert(
-                error.response?.data?.message ||
-                "Unable to post question"
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
+      alert(q.questionPosted);
 
-    return (
-        <MainLayout>
-            <main className="min-w-0 w-full max-w-6xl">
+      const questionId = res.data.data._id;
 
-                {/* Page Heading */}
-                <h1 className="text-2xl font-bold text-gray-800 mb-7">
-                    Ask a public question
-                </h1>
+      router.push(`/questions/${questionId}`);
+    } catch (error: any) {
+      console.log(error);
 
-                {/* Question Form */}
-                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      alert(error.response?.data?.message || q.unableToPost);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-                    {/* Writing a good question */}
-                    <h2 className="text-xl font-bold text-gray-900 mb-8">
-                        Writing a good question
-                    </h2>
+  return (
+    <MainLayout>
+      <main className="w-full min-w-0 max-w-6xl">
+        {/* Page Heading */}
+        <h1 className="mb-5 break-words text-xl font-bold leading-tight text-gray-800 sm:mb-7 sm:text-2xl">
+          {q.heading}
+        </h1>
 
-                    {/* Title */}
-                    <div className="mb-7">
+        {/* Question Form */}
+        <div className="w-full min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6 md:p-7">
+          {/* Writing a good question */}
+          <h2 className="mb-6 break-words text-lg font-bold leading-tight text-gray-900 sm:mb-8 sm:text-xl">
+            {q.writingGoodQuestion}
+          </h2>
 
-                        <label
-                            htmlFor="title"
-                            className="block text-base font-semibold text-gray-900"
-                        >
-                            Title
-                        </label>
+          {/* Title */}
+          <div className="mb-6 sm:mb-7">
+            <label
+              htmlFor="title"
+              className="block break-words text-base font-semibold text-gray-900"
+            >
+              {q.title}
+            </label>
 
-                        <p className="mt-1 text-sm text-gray-600">
-                            Be specific and imagine you're asking a question to another person.
-                        </p>
+            <p className="mt-1 break-words text-sm leading-6 text-gray-600">
+              {q.titleDescription}
+            </p>
 
-                        <input
-                            id="title"
-                            type="text"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder="e.g. How to center a div in CSS?"
-                            className="mt-2 h-10 w-full rounded-md border border-gray-300 px-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                        />
+            <input
+              id="title"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={q.titlePlaceholder}
+              className="mt-2 h-11 w-full min-w-0 rounded-md border border-gray-300 px-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
 
-                    </div>
+          {/* Details */}
+          <div className="mb-6 sm:mb-7">
+            <label
+              htmlFor="details"
+              className="block break-words text-base font-semibold text-gray-900"
+            >
+              {q.detailsTitle}
+            </label>
 
-                    {/* Details */}
-                    <div className="mb-7">
+            <p className="mt-1 break-words text-sm leading-6 text-gray-600">
+              {q.detailsDescription}
+            </p>
 
-                        <label
-                            htmlFor="details"
-                            className="block text-base font-semibold text-gray-900"
-                        >
-                            What are the details of your problem?
-                        </label>
+            <textarea
+              id="details"
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+              placeholder={q.detailsPlaceholder}
+              className="mt-2 min-h-52 w-full min-w-0 resize-y rounded-md border border-gray-300 p-3 text-sm leading-6 text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:min-h-48"
+            />
+          </div>
 
-                        <p className="mt-1 text-sm text-gray-600">
-                            Introduce the problem and expand on what you put in the title. Minimum 20 characters.
-                        </p>
+          {/* Tags */}
+          <div className="mb-6 sm:mb-7">
+            <label
+              htmlFor="tags"
+              className="block break-words text-base font-semibold text-gray-900"
+            >
+              {q.tags}
+            </label>
 
-                        <textarea
-                            id="details"
-                            value={details}
-                            onChange={(e) => setDetails(e.target.value)}
-                            placeholder="Describe your problem in detail..."
-                            className="mt-2 min-h-48 w-full resize-y rounded-md border border-gray-300 p-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                        />
+            <p className="mt-1 break-words text-sm leading-6 text-gray-600">
+              {q.tagsDescription}
+            </p>
 
-                    </div>
+            <input
+              id="tags"
+              type="text"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder={q.tagsPlaceholder}
+              className="mt-2 h-11 w-full min-w-0 rounded-md border border-gray-300 px-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
 
-                    {/* Tags */}
-                    <div className="mb-7">
-
-                        <label
-                            htmlFor="tags"
-                            className="block text-base font-semibold text-gray-900"
-                        >
-                            Tags
-                        </label>
-
-                        <p className="mt-1 text-sm text-gray-600">
-                            Add up to 5 tags to describe what your question is about.
-                        </p>
-
-                        <input
-                            id="tags"
-                            type="text"
-                            value={tags}
-                            onChange={(e) => setTags(e.target.value)}
-                            placeholder="e.g. javascript react nextjs"
-                            className="mt-2 h-10 w-full rounded-md border border-gray-300 px-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                        />
-
-                    </div>
-
-                    {/* Review Button */}
-                    <button
-                        type="button"
-                        onClick={handleReview}
-                        disabled={loading}
-                        className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        {loading
-                            ? "Posting question..."
-                            : "Review your question"}
-                    </button>
-
-                </div>
-
-            </main>
-        </MainLayout>
-    );
+          {/* Review Button */}
+          <button
+            type="button"
+            onClick={handleReview}
+            disabled={loading}
+            className="min-h-10 w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          >
+            {loading ? q.postingQuestion : q.reviewQuestion}
+          </button>
+        </div>
+      </main>
+    </MainLayout>
+  );
 };
 
 export default AskQuestion;

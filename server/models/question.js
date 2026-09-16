@@ -21,6 +21,31 @@ const answerSchema = mongoose.Schema({
         type: Number,
         default: 0,
     },
+
+    upvotedBy: {
+        type: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "user",
+            },
+        ],
+        default: [],
+    },
+
+    downvotedBy: {
+        type: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "user",
+            },
+        ],
+        default: [],
+    },
+
+    reputationRewarded: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const questionSchema = mongoose.Schema({
@@ -53,6 +78,36 @@ const questionSchema = mongoose.Schema({
     votes: {
         type: Number,
         default: 0,
+    },
+
+    upvotedBy: {
+        type: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "user",
+            },
+        ],
+        default: [],
+    },
+
+    downvotedBy: {
+        type: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "user",
+            },
+        ],
+        default: [],
+    },
+
+    reputationRewarded: {
+        type: Boolean,
+        default: false,
+    },
+
+    acceptedAnswerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        default: null,
     },
 
     answers: {

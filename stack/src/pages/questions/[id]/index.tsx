@@ -4,16 +4,18 @@ import MainLayout from "@/layout/MainLayout";
 import QuestionDetail from "@/components/ui/QuestionDetail";
 
 const index = () => {
-    const router = useRouter();
-    const { id } = router.query;
+  const router = useRouter();
+  const { id } = router.query;
 
-    return (
-        <MainLayout>
-            <QuestionDetail
-                questionId={Array.isArray(id) ? id[0] : id}
-            />
-        </MainLayout>
-    );
+  const questionId = Array.isArray(id) ? id[0] : id;
+
+  return (
+    <MainLayout>
+      <div className="w-full min-w-0">
+        <QuestionDetail questionId={questionId} />
+      </div>
+    </MainLayout>
+  );
 };
 
 export default index;
