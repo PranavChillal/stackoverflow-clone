@@ -1,20 +1,343 @@
 import dotenv from "dotenv";
-import nodemailer from "nodemailer";
+import { google } from "googleapis";
 
 dotenv.config();
 
-const transporter =
-    nodemailer.createTransport({
-        service: "gmail",
+/*
+|--------------------------------------------------------------------------
+| Gmail API Configuration
+|--------------------------------------------------------------------------
+*/
 
-        auth: {
-            user:
-                process.env.EMAIL_USER,
+const gmailClientId =
+    process.env.GMAIL_CLIENT_ID;
 
-            pass:
-                process.env.EMAIL_PASSWORD,
-        },
-    });
+const gmailClientSecret =
+    process.env.GMAIL_CLIENT_SECRET;
+
+const gmailRefreshToken =
+    process.env.GMAIL_REFRESH_TOKEN;
+
+const emailUser =
+    process.env.EMAIL_USER;
+
+if (
+    !gmailClientId ||
+    !gmailClientSecret ||
+    !gmailRefreshToken ||
+    !emailUser
+) {
+    console.warn(
+        "Gmail API environment variables are incomplete."
+    );
+}
+
+const oauth2Client =
+    new google.auth.OAuth2(
+        gmailClientId,
+        gmailClientSecret,
+        "http://localhost:3000/oauth2callback"
+    );
+
+oauth2Client.setCredentials({
+    refresh_token:
+        gmailRefreshToken,
+});
+
+const gmail = google.gmail({
+    version: "v1",
+    auth: oauth2Client,
+});
+
+/*
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+*/
+
+const encodeBase64Url = (value) => {
+    return Buffer.from(value)
+        .toString("base64")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/g, "");
+};
+
+const wrapBase64 = (value) => {
+    return value.match(/.{1,76}/g)?.join("\r\n") || "";
+};
+
+const escapeHeaderValue = (value) => {
+    return String(value || "")
+        .replace(/\r/g, "")
+        .replace(/\n/g, "");
+};
+
+const parseEmailAddress = (value) => {
+    const safeValue = String(
+        value || ""
+    ).trim();
+
+    const match = safeValue.match(
+        /^(?:"?([^"<]*)"?\s*)?<([^>]+)>$/
+    );
+
+    if (match) {
+        return {
+            name:
+                match[1]?.trim() ||
+                "CodeQuest",
+            email:
+                match[2]?.trim() ||
+                emailUser,
+        };
+    }
+
+    return {
+        name: "CodeQuest",
+        email: safeValue || emailUser,
+    };
+};
+
+const normalizeRecipients = (to) => {
+    if (Array.isArray(to)) {
+        return to
+            .map((item) => {
+                if (
+                    typeof item ===
+                    "string"
+                ) {
+                    return item.trim();
+                }
+
+                if (
+                    item &&
+                    typeof item.email ===
+                        "string"
+                ) {
+                    return item.email.trim();
+                }
+
+                return "";
+            })
+            .filter(Boolean);
+    }
+
+    return String(to || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+};
+
+const createMimeMessage = ({
+    from,
+    to,
+    subject,
+    text,
+    html,
+    attachments = [],
+}) => {
+    const sender =
+        parseEmailAddress(from);
+
+    const recipients =
+        normalizeRecipients(to);
+
+    const safeSubject =
+        escapeHeaderValue(subject);
+
+    const hasHtml = Boolean(
+        html && String(html).trim()
+    );
+
+    const hasText = Boolean(
+        text && String(text).trim()
+    );
+
+    const hasAttachments =
+        attachments.length > 0;
+
+    let body = "";
+    let outerBoundary = null;
+    let alternativeBoundary = null;
+
+    if (hasAttachments) {
+        outerBoundary =
+            `CodeQuestOuter_${Date.now()}_${Math.random()
+                .toString(36)
+                .slice(2)}`;
+
+        body +=
+            `--${outerBoundary}\r\n`;
+    }
+
+    if (hasHtml && hasText) {
+        alternativeBoundary =
+            `CodeQuestAlt_${Date.now()}_${Math.random()
+                .toString(36)
+                .slice(2)}`;
+
+        body +=
+            `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"\r\n`;
+        body += "\r\n";
+
+        body +=
+            `--${alternativeBoundary}\r\n`;
+        body +=
+            "Content-Type: text/plain; charset=UTF-8\r\n";
+        body +=
+            "Content-Transfer-Encoding: 8bit\r\n";
+        body += "\r\n";
+        body += `${text}\r\n`;
+        body += "\r\n";
+
+        body +=
+            `--${alternativeBoundary}\r\n`;
+        body +=
+            "Content-Type: text/html; charset=UTF-8\r\n";
+        body +=
+            "Content-Transfer-Encoding: 8bit\r\n";
+        body += "\r\n";
+        body += `${html}\r\n`;
+        body += "\r\n";
+
+        body +=
+            `--${alternativeBoundary}--\r\n`;
+    } else if (hasHtml) {
+        body +=
+            "Content-Type: text/html; charset=UTF-8\r\n";
+        body +=
+            "Content-Transfer-Encoding: 8bit\r\n";
+        body += "\r\n";
+        body += `${html}\r\n`;
+    } else {
+        body +=
+            "Content-Type: text/plain; charset=UTF-8\r\n";
+        body +=
+            "Content-Transfer-Encoding: 8bit\r\n";
+        body += "\r\n";
+        body += `${text || ""}\r\n`;
+    }
+
+    if (hasAttachments) {
+        for (const attachment of attachments) {
+            const filename =
+                escapeHeaderValue(
+                    attachment.filename ||
+                        "attachment"
+                );
+
+            const buffer = Buffer.isBuffer(
+                attachment.content
+            )
+                ? attachment.content
+                : Buffer.from(
+                      attachment.content ||
+                          ""
+                  );
+
+            const encoded =
+                wrapBase64(
+                    buffer.toString(
+                        "base64"
+                    )
+                );
+
+            body += "\r\n";
+            body +=
+                `--${outerBoundary}\r\n`;
+            body +=
+                `Content-Type: ${
+                    attachment.contentType ||
+                    "application/octet-stream"
+                }; name="${filename}"\r\n`;
+            body +=
+                "Content-Transfer-Encoding: base64\r\n";
+            body +=
+                `Content-Disposition: attachment; filename="${filename}"\r\n`;
+            body += "\r\n";
+            body += `${encoded}\r\n`;
+        }
+
+        body +=
+            `\r\n--${outerBoundary}--\r\n`;
+    }
+
+    let mime = "";
+
+    mime += `From: ${sender.name} <${sender.email}>\r\n`;
+    mime += `To: ${recipients.join(", ")}\r\n`;
+    mime += `Subject: ${safeSubject}\r\n`;
+    mime += "MIME-Version: 1.0\r\n";
+
+    if (hasAttachments) {
+        mime +=
+            `Content-Type: multipart/mixed; boundary="${outerBoundary}"\r\n`;
+    }
+
+    mime += "\r\n";
+    mime += body;
+
+    return mime;
+};
+
+const sendEmail = async ({
+    from,
+    to,
+    subject,
+    text,
+    html,
+    attachments = [],
+}) => {
+    if (
+        !gmailClientId ||
+        !gmailClientSecret ||
+        !gmailRefreshToken ||
+        !emailUser
+    ) {
+        throw new Error(
+            "Gmail API environment variables are not configured"
+        );
+    }
+
+    const recipients =
+        normalizeRecipients(to);
+
+    if (!recipients.length) {
+        throw new Error(
+            "Email recipient is required"
+        );
+    }
+
+    const mimeMessage =
+        createMimeMessage({
+            from:
+                from ||
+                `"CodeQuest" <${emailUser}>`,
+            to: recipients,
+            subject:
+                subject ||
+                "CodeQuest Notification",
+            text,
+            html,
+            attachments,
+        });
+
+    const raw =
+        encodeBase64Url(
+            mimeMessage
+        );
+
+    const response =
+        await gmail.users.messages.send({
+            userId: "me",
+            requestBody: {
+                raw,
+            },
+        });
+
+    return response.data;
+};
 
 /*
 |--------------------------------------------------------------------------
@@ -41,8 +364,8 @@ export const sendSubscriptionConfirmationEmail =
                 "en-IN"
             );
 
-        const mailOptions = {
-            from: `"CodeQuest" <${process.env.EMAIL_USER}>`,
+        await sendEmail({
+            from: `"CodeQuest" <${emailUser}>`,
 
             to,
 
@@ -150,19 +473,13 @@ CodeQuest Team
                 {
                     filename:
                         `${invoiceNumber}.pdf`,
-
                     content:
                         invoiceBuffer,
-
                     contentType:
                         "application/pdf",
                 },
             ],
-        };
-
-        await transporter.sendMail(
-            mailOptions
-        );
+        });
     };
 
 /*
@@ -177,8 +494,8 @@ export const sendPasswordResetEmail =
         name,
         password,
     }) => {
-        const mailOptions = {
-            from: `"CodeQuest" <${process.env.EMAIL_USER}>`,
+        await sendEmail({
+            from: `"CodeQuest" <${emailUser}>`,
 
             to,
 
@@ -281,11 +598,7 @@ CodeQuest Team
                     </p>
                 </div>
             `,
-        };
-
-        await transporter.sendMail(
-            mailOptions
-        );
+        });
     };
 
 /*
@@ -301,8 +614,8 @@ export const sendLanguageOTPEmail =
         otp,
         language,
     }) => {
-        const mailOptions = {
-            from: `"CodeQuest" <${process.env.EMAIL_USER}>`,
+        await sendEmail({
+            from: `"CodeQuest" <${emailUser}>`,
 
             to,
 
@@ -394,11 +707,7 @@ CodeQuest Team
                     </p>
                 </div>
             `,
-        };
-
-        await transporter.sendMail(
-            mailOptions
-        );
+        });
     };
 
 /*
@@ -429,8 +738,8 @@ export const sendNewDeviceLoginEmail =
             location ||
             "Location unavailable";
 
-        const mailOptions = {
-            from: `"CodeQuest" <${process.env.EMAIL_USER}>`,
+        await sendEmail({
+            from: `"CodeQuest" <${emailUser}>`,
 
             to,
 
@@ -564,11 +873,7 @@ CodeQuest Team
                     </p>
                 </div>
             `,
-        };
-
-        await transporter.sendMail(
-            mailOptions
-        );
+        });
     };
 
 /*
@@ -587,8 +892,8 @@ export const sendLoginOTPEmail =
         deviceType,
         ipAddress,
     }) => {
-        const mailOptions = {
-            from: `"CodeQuest" <${process.env.EMAIL_USER}>`,
+        await sendEmail({
+            from: `"CodeQuest" <${emailUser}>`,
 
             to,
 
@@ -745,9 +1050,5 @@ CodeQuest Team
                     </p>
                 </div>
             `,
-        };
-
-        await transporter.sendMail(
-            mailOptions
-        );
+        });
     };
