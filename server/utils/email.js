@@ -51,7 +51,7 @@ const gmail = google.gmail({
 
 /*
 |--------------------------------------------------------------------------
-| Helpers
+| MIME Helpers
 |--------------------------------------------------------------------------
 */
 
@@ -64,58 +64,68 @@ const encodeBase64Url = (value) => {
 };
 
 const wrapBase64 = (value) => {
-    return value.match(/.{1,76}/g)?.join("\r\n") || "";
+    return (
+        value
+            .match(/.{1,76}/g)
+            ?.join("\r\n") || ""
+    );
 };
 
-const escapeHeaderValue = (value) => {
+const sanitizeHeader = (value) => {
     return String(value || "")
         .replace(/\r/g, "")
         .replace(/\n/g, "");
 };
 
-const parseEmailAddress = (value) => {
-    const safeValue = String(
+const parseSender = (value) => {
+    const senderValue = String(
         value || ""
     ).trim();
 
-    const match = safeValue.match(
+    const match = senderValue.match(
         /^(?:"?([^"<]*)"?\s*)?<([^>]+)>$/
     );
 
     if (match) {
         return {
             name:
-                match[1]?.trim() ||
-                "CodeQuest",
+                sanitizeHeader(
+                    match[1]
+                ) || "CodeQuest",
+
             email:
-                match[2]?.trim() ||
-                emailUser,
+                sanitizeHeader(
+                    match[2]
+                ) || emailUser,
         };
     }
 
     return {
         name: "CodeQuest",
-        email: safeValue || emailUser,
+        email:
+            sanitizeHeader(
+                senderValue
+            ) || emailUser,
     };
 };
 
 const normalizeRecipients = (to) => {
     if (Array.isArray(to)) {
         return to
-            .map((item) => {
+            .map((recipient) => {
                 if (
-                    typeof item ===
+                    typeof recipient ===
                     "string"
                 ) {
-                    return item.trim();
+                    return recipient.trim();
                 }
 
                 if (
-                    item &&
-                    typeof item.email ===
+                    recipient &&
+                    typeof recipient.email ===
                         "string"
                 ) {
-                    return item.email.trim();
+                    return recipient.email.trim();
                 }
 
                 return "";
@@ -125,8 +135,79 @@ const normalizeRecipients = (to) => {
 
     return String(to || "")
         .split(",")
-        .map((item) => item.trim())
+        .map((recipient) =>
+            recipient.trim()
+        )
         .filter(Boolean);
+};
+
+const buildAlternativePart = ({
+    text,
+    html,
+}) => {
+    const hasText = Boolean(
+        text &&
+            String(text).trim()
+    );
+
+    const hasHtml = Boolean(
+        html &&
+            String(html).trim()
+    );
+
+    if (hasText && hasHtml) {
+        const boundary =
+            `CodeQuestAlt_${Date.now()}_${Math.random()
+                .toString(36)
+                .slice(2)}`;
+
+        let body = "";
+
+        body +=
+            `Content-Type: multipart/alternative; boundary="${boundary}"\r\n`;
+        body += "\r\n";
+
+        body +=
+            `--${boundary}\r\n`;
+        body +=
+            "Content-Type: text/plain; charset=UTF-8\r\n";
+        body +=
+            "Content-Transfer-Encoding: 8bit\r\n";
+        body += "\r\n";
+        body += `${text}\r\n`;
+        body += "\r\n";
+
+        body +=
+            `--${boundary}\r\n`;
+        body +=
+            "Content-Type: text/html; charset=UTF-8\r\n";
+        body +=
+            "Content-Transfer-Encoding: 8bit\r\n";
+        body += "\r\n";
+        body += `${html}\r\n`;
+        body += "\r\n";
+
+        body +=
+            `--${boundary}--\r\n`;
+
+        return body;
+    }
+
+    if (hasHtml) {
+        return [
+            "Content-Type: text/html; charset=UTF-8",
+            "Content-Transfer-Encoding: 8bit",
+            "",
+            String(html),
+        ].join("\r\n");
+    }
+
+    return [
+        "Content-Type: text/plain; charset=UTF-8",
+        "Content-Transfer-Encoding: 8bit",
+        "",
+        String(text || ""),
+    ].join("\r\n");
 };
 
 const createMimeMessage = ({
@@ -138,130 +219,29 @@ const createMimeMessage = ({
     attachments = [],
 }) => {
     const sender =
-        parseEmailAddress(from);
+        parseSender(from);
 
     const recipients =
         normalizeRecipients(to);
 
+    if (!sender.email) {
+        throw new Error(
+            "Sender email is required"
+        );
+    }
+
+    if (!recipients.length) {
+        throw new Error(
+            "Recipient email is required"
+        );
+    }
+
     const safeSubject =
-        escapeHeaderValue(subject);
-
-    const hasHtml = Boolean(
-        html && String(html).trim()
-    );
-
-    const hasText = Boolean(
-        text && String(text).trim()
-    );
+        sanitizeHeader(subject);
 
     const hasAttachments =
+        Array.isArray(attachments) &&
         attachments.length > 0;
-
-    let body = "";
-    let outerBoundary = null;
-    let alternativeBoundary = null;
-
-    if (hasAttachments) {
-        outerBoundary =
-            `CodeQuestOuter_${Date.now()}_${Math.random()
-                .toString(36)
-                .slice(2)}`;
-
-        body +=
-            `--${outerBoundary}\r\n`;
-    }
-
-    if (hasHtml && hasText) {
-        alternativeBoundary =
-            `CodeQuestAlt_${Date.now()}_${Math.random()
-                .toString(36)
-                .slice(2)}`;
-
-        body +=
-            `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"\r\n`;
-        body += "\r\n";
-
-        body +=
-            `--${alternativeBoundary}\r\n`;
-        body +=
-            "Content-Type: text/plain; charset=UTF-8\r\n";
-        body +=
-            "Content-Transfer-Encoding: 8bit\r\n";
-        body += "\r\n";
-        body += `${text}\r\n`;
-        body += "\r\n";
-
-        body +=
-            `--${alternativeBoundary}\r\n`;
-        body +=
-            "Content-Type: text/html; charset=UTF-8\r\n";
-        body +=
-            "Content-Transfer-Encoding: 8bit\r\n";
-        body += "\r\n";
-        body += `${html}\r\n`;
-        body += "\r\n";
-
-        body +=
-            `--${alternativeBoundary}--\r\n`;
-    } else if (hasHtml) {
-        body +=
-            "Content-Type: text/html; charset=UTF-8\r\n";
-        body +=
-            "Content-Transfer-Encoding: 8bit\r\n";
-        body += "\r\n";
-        body += `${html}\r\n`;
-    } else {
-        body +=
-            "Content-Type: text/plain; charset=UTF-8\r\n";
-        body +=
-            "Content-Transfer-Encoding: 8bit\r\n";
-        body += "\r\n";
-        body += `${text || ""}\r\n`;
-    }
-
-    if (hasAttachments) {
-        for (const attachment of attachments) {
-            const filename =
-                escapeHeaderValue(
-                    attachment.filename ||
-                        "attachment"
-                );
-
-            const buffer = Buffer.isBuffer(
-                attachment.content
-            )
-                ? attachment.content
-                : Buffer.from(
-                      attachment.content ||
-                          ""
-                  );
-
-            const encoded =
-                wrapBase64(
-                    buffer.toString(
-                        "base64"
-                    )
-                );
-
-            body += "\r\n";
-            body +=
-                `--${outerBoundary}\r\n`;
-            body +=
-                `Content-Type: ${
-                    attachment.contentType ||
-                    "application/octet-stream"
-                }; name="${filename}"\r\n`;
-            body +=
-                "Content-Transfer-Encoding: base64\r\n";
-            body +=
-                `Content-Disposition: attachment; filename="${filename}"\r\n`;
-            body += "\r\n";
-            body += `${encoded}\r\n`;
-        }
-
-        body +=
-            `\r\n--${outerBoundary}--\r\n`;
-    }
 
     let mime = "";
 
@@ -270,16 +250,226 @@ const createMimeMessage = ({
     mime += `Subject: ${safeSubject}\r\n`;
     mime += "MIME-Version: 1.0\r\n";
 
-    if (hasAttachments) {
+    /*
+    |--------------------------------------------------------------------------
+    | No Attachments
+    |--------------------------------------------------------------------------
+    */
+
+    if (!hasAttachments) {
+        const hasText = Boolean(
+            text &&
+                String(text).trim()
+        );
+
+        const hasHtml = Boolean(
+            html &&
+                String(html).trim()
+        );
+
+        if (hasText && hasHtml) {
+            const boundary =
+                `CodeQuestAlt_${Date.now()}_${Math.random()
+                    .toString(36)
+                    .slice(2)}`;
+
+            mime +=
+                `Content-Type: multipart/alternative; boundary="${boundary}"\r\n`;
+            mime += "\r\n";
+
+            mime +=
+                `--${boundary}\r\n`;
+            mime +=
+                "Content-Type: text/plain; charset=UTF-8\r\n";
+            mime +=
+                "Content-Transfer-Encoding: 8bit\r\n";
+            mime += "\r\n";
+            mime += `${text}\r\n`;
+            mime += "\r\n";
+
+            mime +=
+                `--${boundary}\r\n`;
+            mime +=
+                "Content-Type: text/html; charset=UTF-8\r\n";
+            mime +=
+                "Content-Transfer-Encoding: 8bit\r\n";
+            mime += "\r\n";
+            mime += `${html}\r\n`;
+            mime += "\r\n";
+
+            mime +=
+                `--${boundary}--\r\n`;
+
+            return mime;
+        }
+
+        if (hasHtml) {
+            mime +=
+                "Content-Type: text/html; charset=UTF-8\r\n";
+            mime +=
+                "Content-Transfer-Encoding: 8bit\r\n";
+            mime += "\r\n";
+            mime += `${html || ""}\r\n`;
+
+            return mime;
+        }
+
         mime +=
-            `Content-Type: multipart/mixed; boundary="${outerBoundary}"\r\n`;
+            "Content-Type: text/plain; charset=UTF-8\r\n";
+        mime +=
+            "Content-Transfer-Encoding: 8bit\r\n";
+        mime += "\r\n";
+        mime += `${text || ""}\r\n`;
+
+        return mime;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Attachments
+    |--------------------------------------------------------------------------
+    */
+
+    const outerBoundary =
+        `CodeQuestMixed_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2)}`;
+
+    mime +=
+        `Content-Type: multipart/mixed; boundary="${outerBoundary}"\r\n`;
     mime += "\r\n";
-    mime += body;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Main Message Part
+    |--------------------------------------------------------------------------
+    */
+
+    const hasText = Boolean(
+        text &&
+            String(text).trim()
+    );
+
+    const hasHtml = Boolean(
+        html &&
+            String(html).trim()
+    );
+
+    mime +=
+        `--${outerBoundary}\r\n`;
+
+    if (hasText && hasHtml) {
+        const alternativeBoundary =
+            `CodeQuestAlt_${Date.now()}_${Math.random()
+                .toString(36)
+                .slice(2)}`;
+
+        mime +=
+            `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"\r\n`;
+        mime += "\r\n";
+
+        mime +=
+            `--${alternativeBoundary}\r\n`;
+        mime +=
+            "Content-Type: text/plain; charset=UTF-8\r\n";
+        mime +=
+            "Content-Transfer-Encoding: 8bit\r\n";
+        mime += "\r\n";
+        mime += `${text}\r\n`;
+        mime += "\r\n";
+
+        mime +=
+            `--${alternativeBoundary}\r\n`;
+        mime +=
+            "Content-Type: text/html; charset=UTF-8\r\n";
+        mime +=
+            "Content-Transfer-Encoding: 8bit\r\n";
+        mime += "\r\n";
+        mime += `${html}\r\n`;
+        mime += "\r\n";
+
+        mime +=
+            `--${alternativeBoundary}--\r\n`;
+    } else if (hasHtml) {
+        mime +=
+            "Content-Type: text/html; charset=UTF-8\r\n";
+        mime +=
+            "Content-Transfer-Encoding: 8bit\r\n";
+        mime += "\r\n";
+        mime += `${html}\r\n`;
+    } else {
+        mime +=
+            "Content-Type: text/plain; charset=UTF-8\r\n";
+        mime +=
+            "Content-Transfer-Encoding: 8bit\r\n";
+        mime += "\r\n";
+        mime += `${text || ""}\r\n`;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Attachment Parts
+    |--------------------------------------------------------------------------
+    */
+
+    for (const attachment of attachments) {
+        const filename =
+            sanitizeHeader(
+                attachment.filename ||
+                    "attachment"
+            );
+
+        const contentType =
+            sanitizeHeader(
+                attachment.contentType ||
+                    "application/octet-stream"
+            );
+
+        const content =
+            Buffer.isBuffer(
+                attachment.content
+            )
+                ? attachment.content
+                : Buffer.from(
+                      attachment.content ||
+                          ""
+                  );
+
+        const encodedContent =
+            wrapBase64(
+                content.toString(
+                    "base64"
+                )
+            );
+
+        mime += "\r\n";
+        mime +=
+            `--${outerBoundary}\r\n`;
+
+        mime +=
+            `Content-Type: ${contentType}; name="${filename}"\r\n`;
+
+        mime +=
+            "Content-Transfer-Encoding: base64\r\n";
+
+        mime +=
+            `Content-Disposition: attachment; filename="${filename}"\r\n`;
+
+        mime += "\r\n";
+        mime += `${encodedContent}\r\n`;
+    }
+
+    mime +=
+        `\r\n--${outerBoundary}--\r\n`;
 
     return mime;
 };
+
+/*
+|--------------------------------------------------------------------------
+| Send Email Through Gmail API
+|--------------------------------------------------------------------------
+*/
 
 const sendEmail = async ({
     from,
@@ -331,6 +521,7 @@ const sendEmail = async ({
     const response =
         await gmail.users.messages.send({
             userId: "me",
+
             requestBody: {
                 raw,
             },
@@ -473,8 +664,10 @@ CodeQuest Team
                 {
                     filename:
                         `${invoiceNumber}.pdf`,
+
                     content:
                         invoiceBuffer,
+
                     contentType:
                         "application/pdf",
                 },
@@ -621,23 +814,6 @@ export const sendLanguageOTPEmail =
 
             subject:
                 "CodeQuest Language Verification OTP",
-
-            text: `
-Hello ${name || "User"},
-
-You requested to change your CodeQuest language to ${language}.
-
-Your verification OTP is:
-
-${otp}
-
-This OTP is valid for 10 minutes.
-
-If you did not request this language change, please ignore this email.
-
-Regards,
-CodeQuest Team
-            `.trim(),
 
             html: `
                 <div style="
