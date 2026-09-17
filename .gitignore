@@ -5,3 +5,4 @@
 !.env.example
 .vercel
 .env*
+server/google-oauth-client.json
