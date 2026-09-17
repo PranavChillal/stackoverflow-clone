@@ -113,7 +113,7 @@ export default function SignUpPage() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder={displayNamePlaceholder}
                 autoComplete="name"
-                className="mt-1 h-11 w-full"
+                className="mt-1 h-11 w-full text-zinc-900 placeholder:text-zinc-400"
               />
             </div>
 
@@ -128,7 +128,7 @@ export default function SignUpPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={a.email || "Enter your email"}
                 autoComplete="email"
-                className="mt-1 h-11 w-full"
+                className="mt-1 h-11 w-full text-zinc-900 placeholder:text-zinc-400"
               />
             </div>
 
@@ -145,7 +145,7 @@ export default function SignUpPage() {
                 autoComplete="tel"
                 inputMode="numeric"
                 maxLength={10}
-                className="mt-1 h-11 w-full"
+                className="mt-1 h-11 w-full text-zinc-900 placeholder:text-zinc-400"
               />
 
               <p className="mt-1 break-words text-xs leading-5 text-zinc-500">
@@ -164,7 +164,7 @@ export default function SignUpPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={a.password || "Password"}
                 autoComplete="new-password"
-                className="mt-1 h-11 w-full"
+                className="mt-1 h-11 w-full text-zinc-900 placeholder:text-zinc-400"
               />
 
               <p className="mt-1 break-words text-xs leading-5 text-zinc-500">
